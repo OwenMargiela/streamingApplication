@@ -29,6 +29,18 @@ async function Transcoder(videoBuffer) {
         fs.mkdirSync(outputDir);
     }
 
+    const directories = [
+        'stream-pipe-output_hls/output_720',
+        'stream-pipe-output_hls/output_480',
+        'stream-pipe-output_hls/output_180'
+    ];
+
+    directories.forEach(dir => {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+    });
+
 
     // Encoding specifications
     const specs = [
@@ -39,6 +51,7 @@ async function Transcoder(videoBuffer) {
 
     let index = 0
     for (const spec of specs) {
+        /*
         const command = [
             '-i', 'pipe:0',
             '-c:v', 'libx264', '-b:v', spec.bitrate, '-s', spec.resolution, '-profile:v', 'baseline',
@@ -49,8 +62,23 @@ async function Transcoder(videoBuffer) {
             '-hls_flags', 'independent_segments',
             '-hls_segment_type', 'mpegts',
             '-hls_playlist_type', 'vod',
-            '-hls_segment_filename', `${outputDir}/RES${index}${spec.dir}-segment_%03d.ts`,
+            '-hls_segment_filename', `${outputDir}/${spec.dir}-segment_%03d.ts`,
             `${outputDir}/${spec.dir}.m3u8`
+        ];
+        index++
+        */
+        const command = [
+            '-i', 'pipe:0',
+            '-c:v', 'libx264', '-b:v', spec.bitrate, '-s', spec.resolution, '-profile:v', 'baseline',
+            '-c:a', 'aac', '-b:a', spec.audioBitrate, '-ac', '2',
+            '-f', 'hls',
+            '-hls_time', '4',
+            '-hls_list_size', '10',
+            '-hls_flags', 'independent_segments',
+            '-hls_segment_type', 'mpegts',
+            '-hls_playlist_type', 'vod',
+            '-hls_segment_filename', `${outputDir}/${spec.dir}/segment_%03d.ts`,
+            `${outputDir}/${spec.dir}/${spec.dir}.m3u8`
         ];
         index++
 
@@ -79,10 +107,11 @@ async function Transcoder(videoBuffer) {
 
     // Create the master playlist
     const masterPlaylistPath = path.join(outputDir, 'master.m3u8');
-    const masterPlaylistContent = specs.map(spec => {
-        return `#EXT-X-STREAM-INF:BANDWIDTH=${parseInt(spec.bitrate) * 1000},RESOLUTION=${spec.resolution}\n${spec.dir}/${spec.dir}.m3u8`;
+    let body = specs.map(spec => {
+        return `#EXT-X-STREAM-INF:BANDWIDTH=${parseInt(spec.bitrate) * 1000},RESOLUTION=${spec.resolution}\n${spec.dir}.m3u8`;
     }).join('\n');
-
+    let contentHeader = '#EXTM3U\n#EXT-X-VERSION:3\n'
+    const masterPlaylistContent = contentHeader + body
     fs.writeFileSync(masterPlaylistPath, masterPlaylistContent);
     console.log('Master playlist created:', masterPlaylistPath);
 }

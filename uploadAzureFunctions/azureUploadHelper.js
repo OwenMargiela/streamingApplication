@@ -2,6 +2,8 @@
 const AZURE = require("@azure/storage-blob");
 const { PassThrough } = require('stream')
 
+const fs = require('fs');
+const path = require('path');
 
 
 class AzureInstance {
@@ -86,9 +88,9 @@ class AzureInstance {
                     blockNumber++;
                     offset += chunk.length;
                 }
-                await blockBlobClient.commitBlockList(blockIDs, {
-                    blobHTTPHeaders: { blobContentType: 'text/vtt' }
-                });
+                await blockBlobClient.commitBlockList(blockIDs);
+                
+                //{blobHTTPHeaders: { blobContentType: 'text/vtt' }}
 
                 //console.log('File uploaded to:', file_URL);
                 const url = `https://${process.env.ACCOUNT_NAME}.blob.core.windows.net/${dest}/${filename}`;
@@ -131,6 +133,39 @@ class AzureInstance {
 
         return blobresponse.readableStreamBody;
     }
+
+
+    async  uploadFolder(folderPath, destinationFolder,localFolderPath) {
+        const files = fs.readdirSync(folderPath);
+        
+        for (const file of files) {
+            const filePath = path.join(folderPath, file);
+            const stat = fs.statSync(filePath);
+            
+            if (stat.isDirectory()) {
+                // Recursively upload subdirectories
+                await this.uploadFolder(filePath, destinationFolder,localFolderPath);
+            } else {
+                // Upload file
+                await this.#uploadFile(filePath, destinationFolder,localFolderPath);
+            }
+        }
+    }
+    
+    async  #uploadFile(filePath, destinationFolder,localFolderPath) {
+        // Construct the blob name with the destination folder
+        const relativePath = path.relative(localFolderPath, filePath).replace(/\\/g, '/');
+        const blobName = path.join(destinationFolder, relativePath).replace(/\\/g, '/');
+        const containerClient = this.#blobServiceClient.getContainerClient('hlsstreaming')
+        const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+        
+        console.log(`Uploading ${filePath} as ${blobName}`);
+        
+        // Upload file to Blob Storage
+        const uploadBlobResponse = await blockBlobClient.uploadFile(filePath);
+        console.log(`Uploaded blob ${blobName} successfully`, uploadBlobResponse.requestId);
+    }
+    
     /**
      *
      * @param {string} filename

@@ -34,7 +34,9 @@ async function receiveMessages() {
                     else {
                         console.log('Executing Pipeline')
                         
-                    TranscoderPipeline(event.body)
+                    
+                    
+                        //TranscoderPipeline(event.body)
                     
                     try {
                         /*
